@@ -22,6 +22,14 @@ server.options('/post', function(req, res) {
     res.sendStatus(200);
 })
 
+server.get('/post', function(req, res) {
+    res.send('GET request to /post');
+})
+
+server.options('/user/me', function(req, res) {
+    res.sendStatus(200);
+})
+
 server.post('/post', function(req, res) {
     res.send('POST request to /post');
 })
@@ -76,10 +84,20 @@ server.post('/auth/register', async (req, res) => {
     const token = jwt.sign({ userId: newUser._id }, 'votre-secret-jwt', { expiresIn: '24h' });
 
     // Répondre avec le token
-    res.status(201).json({ token });
+    res.status(201).json({
+        ok: true,
+        data: {
+          token,
+          user: {
+            email: newUser.email,
+            firstName: newUser.firstName,
+            lastName: newUser.lastName
+          }
+        }
+    });
   } catch (error) {
     console.error(error);
-    res.status(500).json({ message: 'Erreur lors de la création de l\'utilisateur' });
+    res.status(500).json({ ok: false, message: 'Erreur lors de la création de l\'utilisateur' });
   }
 });
 
