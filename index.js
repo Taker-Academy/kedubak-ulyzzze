@@ -1,24 +1,15 @@
 const PORT = 8080;
-var express = require('express');
-var server = express();
-var jwt = require('jsonwebtoken');
-// const { MongoClient } = require('mongodb');
-// const client = new MongoClient(process.env.MONGO_URL, { useNewUrlParser: true, useUnifiedTopology: true });
+const express = require('express');
+const server = express();
+const jwt = require('jsonwebtoken');
+const bcrypt = require('bcrypt');
+const mongoose = require('mongoose');
+require('dotenv').config();
 
-// async function run() {
-//     await client.connect();
-//     console.log('Connection Ok');
-//     // const db = client.db('myTask');
-//     // const collection = db.collection('doc');
-//     // const insertStuff = await collection.insertMany([{a : 1}, {b : 2}, {c : 3}])
-//     // console.log(`Documents insérés : ${insertStuff}`);
-//     return 'done!';
-// }
+// Utilisation de l'URL de MongoDB fournie
+const MONGO_URL = process.env.MONGO_URL;
 
-// run()
-//   .then(console.log)
-//   .catch(console.error)
-//   .finally(() => client.close())
+server.use(express.json());
 
 server.use((req, res, next) => {
     res.setHeader('Access-Control-Allow-Origin', 'http://localhost:3000');
@@ -34,6 +25,63 @@ server.options('/post', function(req, res) {
 server.post('/post', function(req, res) {
     res.send('POST request to /post');
 })
+
+// Connexion à la base de données MongoDB
+mongoose.connect(MONGO_URL, {
+  useNewUrlParser: true,
+  useUnifiedTopology: true
+});
+
+const db = mongoose.connection;
+db.on('error', console.error.bind(console, 'Erreur de connexion à MongoDB :'));
+db.once('open', () => {
+  console.log('Connecté à MongoDB');
+});
+
+// Schéma et modèle d'utilisateur
+const userSchema = new mongoose.Schema({
+  email: { type: String, required: true, unique: true },
+  password: { type: String, required: true },
+  firstName: { type: String, required: true },
+  lastName: { type: String, required: true }
+}, {collection: 'users'});
+
+const User = mongoose.model('create_user', userSchema);
+
+server.post('/auth/register', async (req, res) => {
+  const { email, password, firstName, lastName } = req.body;
+
+  try {
+    // Vérifier si l'utilisateur existe déjà
+    const existingUser = await User.findOne({ email });
+    if (existingUser) {
+      return res.status(400).json({ message: 'Un utilisateur avec cette adresse e-mail existe déjà' });
+    }
+
+    // Hasher le mot de passe
+    const hashedPassword = await bcrypt.hash(password, 10);
+
+    // Créer un nouvel utilisateur
+    const newUser = new User({
+      email,
+      password: hashedPassword,
+      firstName,
+      lastName
+    });
+
+    // Enregistrer l'utilisateur dans la base de données
+    await newUser.save();
+
+    // Générer un token JWT
+    const token = jwt.sign({ userId: newUser._id }, 'votre-secret-jwt', { expiresIn: '24h' });
+
+    // Répondre avec le token
+    res.status(201).json({ token });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: 'Erreur lors de la création de l\'utilisateur' });
+  }
+});
 
 server.get('/auth', function (req, res) {
 });
