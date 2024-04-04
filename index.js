@@ -22,10 +22,6 @@ server.options('/post', function(req, res) {
     res.sendStatus(200);
 })
 
-server.get('/post', function(req, res) {
-    res.send('GET request to /post');
-})
-
 server.options('/user/me', function(req, res) {
     res.sendStatus(200);
 })
