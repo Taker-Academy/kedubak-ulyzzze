@@ -160,6 +160,34 @@ function ensureToken(req, res, next) {
     }
 }
 
+server.get('/user/me', ensureToken, async (req, res) => {
+  try {
+    // Vérification du token JWT
+    jwt.verify(req.token, 'votre-secret-jwt', async (err, decoded) => {
+      if (err) {
+        return res.status(401).json({ message: 'Mauvais token JWT' });
+      }
+      // Recherche de l'utilisateur dans la base de données en utilisant l'ID décodé du token
+      const user = await User.findById(decoded.userId);
+      if (!user) {
+        return res.status(500).json({ message: 'Utilisateur introuvable' });
+      }
+      // Répondre avec les informations de l'utilisateur
+      res.status(200).json({
+        ok: true,
+        data: {
+          email: user.email,
+          firstName: user.firstName,
+          lastName: user.lastName
+        }
+      });
+    });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: 'Erreur lors de la récupération des informations utilisateur' });
+  }
+});
+
 server.listen(PORT, function() {
     console.log(`working on http://localhost:${PORT}`)
 });
