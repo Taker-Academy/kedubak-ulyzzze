@@ -6,7 +6,6 @@ const bcrypt = require('bcrypt');
 const mongoose = require('mongoose');
 require('dotenv').config();
 
-// Utilisation de l'URL de MongoDB fournie
 const MONGO_URL = process.env.MONGO_URL;
 
 server.use(express.json());
@@ -100,12 +99,41 @@ server.post('/auth/register', async (req, res) => {
 server.get('/auth', function (req, res) {
 });
 
-server.get('/auth/login', function(req, res) {
-    const user = { id: 3};
-    const token = jwt.sign({ user }, 'my_secret_key');
-    res.json({
-        token: token
+server.post('/auth/login', async (req, res) => {
+  const { email, password } = req.body;
+
+  try {
+    // Recherche de l'utilisateur dans la base de données
+    const user = await User.findOne({ email });
+    if (!user) {
+      return res.status(401).json({ message: 'Adresse e-mail ou mot de passe incorrect' });
+    }
+
+    // Vérification du mot de passe
+    const passwordMatch = await bcrypt.compare(password, user.password);
+    if (!passwordMatch) {
+      return res.status(401).json({ message: 'Adresse e-mail ou mot de passe incorrect' });
+    }
+
+    // Génération du token JWT
+    const token = jwt.sign({ userId: user._id }, 'votre-secret-jwt', { expiresIn: '24h' });
+
+    // Répondre avec le token et les informations de l'utilisateur
+    res.status(200).json({
+      ok: true,
+      data: {
+        token,
+        user: {
+          email: user.email,
+          firstName: user.firstName,
+          lastName: user.lastName
+        }
+      }
     });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: 'Erreur lors de la tentative de connexion' });
+  }
 });
 
 server.get('/auth/protection', ensureToken, function( req, res) {
