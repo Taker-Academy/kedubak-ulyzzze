@@ -55,16 +55,13 @@ server.post('/auth/register', async (req, res) => {
   const { email, password, firstName, lastName } = req.body;
 
   try {
-    // Vérifier si l'utilisateur existe déjà
     const existingUser = await User.findOne({ email });
     if (existingUser) {
       return res.status(400).json({ message: 'Un utilisateur avec cette adresse e-mail existe déjà' });
     }
 
-    // Hasher le mot de passe
     const hashedPassword = await bcrypt.hash(password, 10);
 
-    // Créer un nouvel utilisateur
     const newUser = new User({
       email,
       password: hashedPassword,
@@ -72,13 +69,9 @@ server.post('/auth/register', async (req, res) => {
       lastName
     });
 
-    // Enregistrer l'utilisateur dans la base de données
     await newUser.save();
-
-    // Générer un token JWT
     const token = jwt.sign({ userId: newUser._id }, 'votre-secret-jwt', { expiresIn: '24h' });
 
-    // Répondre avec le token
     res.status(201).json({
         ok: true,
         data: {
@@ -103,22 +96,17 @@ server.post('/auth/login', async (req, res) => {
   const { email, password } = req.body;
 
   try {
-    // Recherche de l'utilisateur dans la base de données
     const user = await User.findOne({ email });
     if (!user) {
       return res.status(401).json({ message: 'Adresse e-mail ou mot de passe incorrect' });
     }
 
-    // Vérification du mot de passe
     const passwordMatch = await bcrypt.compare(password, user.password);
     if (!passwordMatch) {
       return res.status(401).json({ message: 'Adresse e-mail ou mot de passe incorrect' });
     }
 
-    // Génération du token JWT
     const token = jwt.sign({ userId: user._id }, 'votre-secret-jwt', { expiresIn: '24h' });
-
-    // Répondre avec le token et les informations de l'utilisateur
     res.status(200).json({
       ok: true,
       data: {
@@ -162,17 +150,14 @@ function ensureToken(req, res, next) {
 
 server.get('/user/me', ensureToken, async (req, res) => {
   try {
-    // Vérification du token JWT
     jwt.verify(req.token, 'votre-secret-jwt', async (err, decoded) => {
       if (err) {
         return res.status(401).json({ message: 'Mauvais token JWT' });
       }
-      // Recherche de l'utilisateur dans la base de données en utilisant l'ID décodé du token
       const user = await User.findById(decoded.userId);
       if (!user) {
         return res.status(500).json({ message: 'Utilisateur introuvable' });
       }
-      // Répondre avec les informations de l'utilisateur
       res.status(200).json({
         ok: true,
         data: {
@@ -187,6 +172,99 @@ server.get('/user/me', ensureToken, async (req, res) => {
     res.status(500).json({ message: 'Erreur lors de la récupération des informations utilisateur' });
   }
 });
+
+server.put('/user/edit', ensureToken, async (req, res) => {
+  try {
+    jwt.verify(req.token, 'votre-secret-jwt', async (err, decoded) => {
+      if (err) {
+        return res.status(401).json({ message: 'Mauvais token JWT' });
+      }
+      const user = await User.findById(decoded.userId);
+      if (!user) {
+        return res.status(500).json({ message: 'Utilisateur introuvable' });
+      }
+
+      if (req.body.firstName) {
+        user.firstName = req.body.firstName;
+      }
+      if (req.body.lastName) {
+        user.lastName = req.body.lastName;
+      }
+      if (req.body.email) {
+        user.email = req.body.email;
+      }
+      if (req.body.password) {
+        const hashedPassword = await bcrypt.hash(req.body.password, 10);
+        user.password = hashedPassword;
+      }
+      await user.save();
+
+      res.status(200).json({
+        ok: true,
+        data: {
+          email: user.email,
+          firstName: user.firstName,
+          lastName: user.lastName
+        }
+      });
+    });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: 'Erreur lors de la mise à jour des informations utilisateur' });
+  }
+});
+
+server.delete('/user/remove', ensureToken, async (req, res) => {
+  try {
+    jwt.verify(req.token, 'votre-secret-jwt', async (err, decoded) => {
+      if (err) {
+        return res.status(401).json({ message: 'Mauvais token JWT' });
+      }
+      const user = await User.findById(decoded.userId);
+      if (!user) {
+        return res.status(404).json({ message: 'Utilisateur non trouvé' });
+      }
+
+      await User.findByIdAndDelete(decoded.userId);
+
+      res.status(200).json({
+        ok: true,
+        data: {
+          email: user.email,
+          firstName: user.firstName,
+          lastName: user.lastName,
+          removed: true
+        }
+      });
+    });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: 'Erreur lors de la suppresion du compte' });
+  }
+});
+
+server.get('/post/', ensureToken, async (req, res) => {
+  try {
+    jwt.verify(req.token, 'votre-secret-jwt', async (err, decoded) => {
+      if (err) {
+        return res.status(401).json({ message: 'Mauvais token JWT' });
+      }
+
+      res.status(200).json({
+        ok: true,
+        data: {
+          email: user.email,
+          firstName: user.firstName,
+          lastName: user.lastName,
+          removed: true
+        }
+      });
+    });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: 'Erreur lors de la récupération de la liste des éléments' });
+  }
+})
 
 server.listen(PORT, function() {
     console.log(`working on http://localhost:${PORT}`)
