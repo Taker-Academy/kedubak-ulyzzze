@@ -314,7 +314,60 @@ server.post('/post', ensureToken, async (req, res) => {
     });
   } catch (error) {
     console.error(error);
-    res.status(500).json({ message: 'Erreur lors de la création du post' });
+    res.status(400).json({ message: 'Erreur lors de la création du post' });
+  }
+});
+
+server.get('/post/me', ensureToken, async (req, res) => {
+  try {
+    jwt.verify(req.token, 'votre-secret-jwt', async (err, decoded) => {
+      if (err) {
+        return res.status(401).json({ message: 'Mauvais token JWT' });
+      }
+      const posts = await Post.find({ userId: decoded.userId});
+      res.status(200).json({
+        ok: true,
+        data: posts
+      })
+    });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: `Erreur lors de la récupération des posts de l'utilisateur` });
+  }
+});
+
+server.get('/post/:id', ensureToken, async (req, res) => {
+  try {
+    jwt.verify(req.token, 'votre-secret-jwt', async (err, decoded) => {
+      if (err) {
+        return res.status(401).json({ message: 'Mauvais token JWT' });
+      }
+      const postId = req.params.id;
+      const post = await Post.findById(postId);
+
+      if (!post) {
+        return res.status(404).json({ message: 'Element non trouvé' });
+      }
+
+      const user = await User.findById(post.userId);
+
+      res.status(200).json({
+        ok: true,
+        data: {
+          _id: post._id,
+          createdAt: post.createdAt,
+          userId: user._id,
+          firstName: user.firstName,
+          title: post.title,
+          content: post.content,
+          comments: post.comments,
+          upVotes: post.upVotes
+        }
+      })
+    });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: `Erreur lors de la récupération des posts de l'utilisateur` });
   }
 });
 
