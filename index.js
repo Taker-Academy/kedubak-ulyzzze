@@ -367,7 +367,75 @@ server.get('/post/:id', ensureToken, async (req, res) => {
     });
   } catch (error) {
     console.error(error);
-    res.status(500).json({ message: `Erreur lors de la récupération des posts de l'utilisateur` });
+    res.status(500).json({ message: `Erreur lors de la récupération du post` });
+  }
+});
+
+server.delete('/post/:id', ensureToken, async (req, res) => {
+  try {
+    jwt.verify(req.token, 'votre-secret-jwt', async (err, decoded) => {
+      if (err) {
+        return res.status(401).json({ message: 'Mauvais token JWT' });
+      }
+      
+      const postId = req.params.id;
+      const post = await Post.findOneAndDelete({ _id: postId, userId: decoded.userId });
+
+      if (!post) {
+        return res.status(404).json({ message: 'Elément non trouvé' });
+      }
+
+      const user = await User.findById(post.userId);
+
+      res.status(200).json({
+        ok: true,
+        data: {
+          _id: post._id,
+          createdAt: post.createdAt,
+          userId: user._id,
+          firstName: user.firstName,
+          title: post.title,
+          content: post.content,
+          comments: post.comments,
+          upVotes: post.upVotes,
+          removed: true
+        }
+      });
+    });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: 'Erreur lors de la suppression du post' });
+  }
+});
+
+server.post('/post/vote/:id', ensureToken, async (req, res) => {
+  try {
+    jwt.verify(req.token, 'votre-secret-jwt', async (err, decoded) => {
+      if (err) {
+        return res.status(401).json({ message: 'Mauvais token JWT' });
+      }
+      const postId = req.params.id;
+      const post = await Post.findById(postId);
+
+      if (!post) {
+        return res.status(404).json({ message: 'Elément non trouvé' });
+      }
+
+      const alreadyUpvoted = post.upVotes.includes(decoded.userId);
+      if (alreadyUpvoted) {
+        return res.status(409).json({ message: 'Vous avez déjà voté pour ce post.' });
+      }
+      post.upVotes.push(decoded.userId);
+      await post.save();
+      
+      res.status(200).json({
+        ok: true,
+        message: "post upvoted"
+      })
+    });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: `Erreur lors du vote` });
   }
 });
 
