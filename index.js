@@ -17,18 +17,6 @@ server.use((req, res, next) => {
     next();
 });
 
-server.options('/post', function(req, res) {
-    res.sendStatus(200);
-})
-
-server.options('/user/me', function(req, res) {
-    res.sendStatus(200);
-})
-
-server.post('/post', function(req, res) {
-    res.send('POST request to /post');
-})
-
 // Connexion à la base de données MongoDB
 mongoose.connect(MONGO_URL, {
   useNewUrlParser: true,
@@ -51,9 +39,20 @@ const userSchema = new mongoose.Schema({
 
 const User = mongoose.model('create_user', userSchema);
 
+// server.options('/post', function(req, res) {
+//   res.sendStatus(200);
+// })
+
+// server.options('/user/me', function(req, res) {
+//   res.sendStatus(200);
+// })
+
+// server.post('/post', function(req, res) {
+//   res.send('POST request to /post');
+// })
+
 server.post('/auth/register', async (req, res) => {
   const { email, password, firstName, lastName } = req.body;
-
   try {
     const existingUser = await User.findOne({ email });
     if (existingUser) {
@@ -89,8 +88,8 @@ server.post('/auth/register', async (req, res) => {
   }
 });
 
-server.get('/auth', function (req, res) {
-});
+// server.get('/auth', function (req, res) {
+// });
 
 server.post('/auth/login', async (req, res) => {
   const { email, password } = req.body;
@@ -124,17 +123,17 @@ server.post('/auth/login', async (req, res) => {
   }
 });
 
-server.get('/auth/protection', ensureToken, function( req, res) {
-    jwt.verify(req.token, 'my_secret_key', function(err, data) {
-        if(err) {
-            res.sendStatus(403);
-        } else {
-            res.json({
-                data: data
-            });
-        }
-    });
-});
+// server.get('/auth/protection', ensureToken, function( req, res) {
+//     jwt.verify(req.token, 'my_secret_key', function(err, data) {
+//         if(err) {
+//             res.sendStatus(403);
+//         } else {
+//             res.json({
+//                 data: data
+//             });
+//         }
+//     });
+// });
 
 function ensureToken(req, res, next) {
     const bearerHeader = req.headers["authorization"];
@@ -243,28 +242,81 @@ server.delete('/user/remove', ensureToken, async (req, res) => {
   }
 });
 
-server.get('/post/', ensureToken, async (req, res) => {
+const postSchema = new mongoose.Schema({
+  userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+  title: String,
+  content: String,
+  createdAt: { type: Date, default: Date.now },
+  comments: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Comment' }],
+  upVotes: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }]
+}, {collection: 'posts'});
+
+const Post = mongoose.model('Post', postSchema);
+
+server.get('/post', ensureToken, async (req, res) => {
   try {
     jwt.verify(req.token, 'votre-secret-jwt', async (err, decoded) => {
       if (err) {
         return res.status(401).json({ message: 'Mauvais token JWT' });
       }
 
+      const user = await User.findById(decoded.userId);
+      if (!user) {
+        return res.status(404).json({ message: 'Utilisateur non trouvé' });
+      }
+
+      const posts = await Post.find({});
+
       res.status(200).json({
         ok: true,
-        data: {
-          email: user.email,
-          firstName: user.firstName,
-          lastName: user.lastName,
-          removed: true
-        }
+        data: posts
       });
     });
   } catch (error) {
     console.error(error);
     res.status(500).json({ message: 'Erreur lors de la récupération de la liste des éléments' });
   }
-})
+});
+
+server.post('/post', ensureToken, async (req, res) => {
+  try {
+    jwt.verify(req.token, 'votre-secret-jwt', async (err, decoded) => {
+      if (err) {
+        return res.status(401).json({ message: 'Mauvais token JWT' });
+      }
+
+      const { title, content } = req.body;
+      const user = await User.findById(decoded.userId);
+      const newPost = new Post({
+        userId: user._id,
+        title: title,
+        content: content,
+        createdAt: new Date(),
+        comments: [],
+        upVotes: []
+      });
+
+      await newPost.save();
+
+      res.status(201).json({
+        ok: true,
+        data: {
+          _id: newPost._id,
+          createdAt: newPost.createdAt,
+          userId: user._id,
+          firstName: user.firstName,
+          title: newPost.title,
+          content: newPost.content,
+          comments: newPost.comments,
+          upVotes: newPost.upVotes
+        }
+      });
+    });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: 'Erreur lors de la création du post' });
+  }
+});
 
 server.listen(PORT, function() {
     console.log(`working on http://localhost:${PORT}`)
