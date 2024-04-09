@@ -17,7 +17,6 @@ server.use((req, res, next) => {
     next();
 });
 
-// Connexion à la base de données MongoDB
 mongoose.connect(MONGO_URL, {
   useNewUrlParser: true,
   useUnifiedTopology: true
@@ -29,7 +28,6 @@ db.once('open', () => {
   console.log('Connecté à MongoDB');
 });
 
-// Schéma et modèle d'utilisateur
 const userSchema = new mongoose.Schema({
   email: { type: String, required: true, unique: true },
   password: { type: String, required: true },
@@ -38,18 +36,6 @@ const userSchema = new mongoose.Schema({
 }, {collection: 'users'});
 
 const User = mongoose.model('create_user', userSchema);
-
-// server.options('/post', function(req, res) {
-//   res.sendStatus(200);
-// })
-
-// server.options('/user/me', function(req, res) {
-//   res.sendStatus(200);
-// })
-
-// server.post('/post', function(req, res) {
-//   res.send('POST request to /post');
-// })
 
 server.post('/auth/register', async (req, res) => {
   const { email, password, firstName, lastName } = req.body;
@@ -88,9 +74,6 @@ server.post('/auth/register', async (req, res) => {
   }
 });
 
-// server.get('/auth', function (req, res) {
-// });
-
 server.post('/auth/login', async (req, res) => {
   const { email, password } = req.body;
 
@@ -122,18 +105,6 @@ server.post('/auth/login', async (req, res) => {
     res.status(500).json({ message: 'Erreur lors de la tentative de connexion' });
   }
 });
-
-// server.get('/auth/protection', ensureToken, function( req, res) {
-//     jwt.verify(req.token, 'my_secret_key', function(err, data) {
-//         if(err) {
-//             res.sendStatus(403);
-//         } else {
-//             res.json({
-//                 data: data
-//             });
-//         }
-//     });
-// });
 
 function ensureToken(req, res, next) {
     const bearerHeader = req.headers["authorization"];
@@ -343,7 +314,7 @@ server.get('/post/:id', ensureToken, async (req, res) => {
         return res.status(401).json({ message: 'Mauvais token JWT' });
       }
       const postId = req.params.id;
-      const post = await Post.findById(postId);
+      const post = await Post.findById(postId).populate('comments');
 
       if (!post) {
         return res.status(404).json({ message: 'Element non trouvé' });
@@ -386,6 +357,7 @@ server.delete('/post/:id', ensureToken, async (req, res) => {
       }
 
       const user = await User.findById(post.userId);
+      await Comment.deleteMany({ post: postId });
 
       res.status(200).json({
         ok: true,
@@ -436,6 +408,58 @@ server.post('/post/vote/:id', ensureToken, async (req, res) => {
   } catch (error) {
     console.error(error);
     res.status(500).json({ message: `Erreur lors du vote` });
+  }
+});
+
+const commentSchema = new mongoose.Schema({
+  post: { type: mongoose.Schema.Types.ObjectId, ref: 'Post' },
+  firstName: String,
+  content: String,
+  createdAt: { type: Date, default: Date.now }
+});
+
+const Comment = mongoose.model('Comment', commentSchema);
+
+server.post('/comment/:id', ensureToken, async (req, res) => {
+  try {
+    jwt.verify(req.token, 'votre-secret-jwt', async (err, decoded) => {
+      if (err) {
+        return res.status(401).json({ message: 'Mauvais token JWT' });
+      }
+      
+      const postId = req.params.id;
+      const post = await Post.findById(postId);
+
+      if (!post) {
+        return res.status(404).json({ message: 'Elément non trouvé' });
+      }
+
+      const { content } = req.body;
+      const newComment = new Comment({
+        post: postId,
+        firstName: decoded.firstName,
+        content: content,
+        createdAt: Date.now()
+      });
+
+      await newComment.save();
+
+      post.comments.push(newComment._id);
+      await post.save();
+      
+      res.status(201).json({
+        ok: true,
+        data: {
+          _id: newComment._id,
+          firstName: newComment.firstName,
+          content: newComment.content,
+          createdAt: newComment.createdAt
+        }
+      });
+    });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: `Erreur lors de la création du commentaire` });
   }
 });
 
