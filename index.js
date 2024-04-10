@@ -1,3 +1,4 @@
+//Requires
 const PORT = 8080;
 const express = require('express');
 const server = express();
@@ -6,10 +7,10 @@ const bcrypt = require('bcrypt');
 const mongoose = require('mongoose');
 require('dotenv').config();
 
+
+//Connect to mongoDB
 const MONGO_URL = process.env.MONGO_URL;
-
 server.use(express.json());
-
 server.use((req, res, next) => {
     res.setHeader('Access-Control-Allow-Origin', 'http://localhost:3000');
     res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS, PUT, PATCH, DELETE');
@@ -25,6 +26,8 @@ db.once('open', () => {
   console.log('Connecté à MongoDB');
 });
 
+
+//Create user schema for mongoDB
 const userSchema = new mongoose.Schema({
   email: { type: String, required: true, unique: true },
   password: { type: String, required: true },
@@ -34,6 +37,8 @@ const userSchema = new mongoose.Schema({
 
 const User = mongoose.model('create_user', userSchema);
 
+
+//Authentification
 server.post('/auth/register', async (req, res) => {
   const { email, password, firstName, lastName } = req.body;
   try {
@@ -115,6 +120,8 @@ function ensureToken(req, res, next) {
     }
 }
 
+
+//User Account
 server.get('/user/me', ensureToken, async (req, res) => {
   try {
     jwt.verify(req.token, 'votre-secret-jwt', async (err, decoded) => {
@@ -210,6 +217,8 @@ server.delete('/user/remove', ensureToken, async (req, res) => {
   }
 });
 
+
+//Create post schema for mongoDB
 const postSchema = new mongoose.Schema({
   userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
   title: String,
@@ -221,6 +230,8 @@ const postSchema = new mongoose.Schema({
 
 const Post = mongoose.model('Post', postSchema);
 
+
+//Posts
 server.get('/post', ensureToken, async (req, res) => {
   try {
     jwt.verify(req.token, 'votre-secret-jwt', async (err, decoded) => {
@@ -408,6 +419,8 @@ server.post('/post/vote/:id', ensureToken, async (req, res) => {
   }
 });
 
+
+//Create comment schema for mongoDB
 const commentSchema = new mongoose.Schema({
   post: { type: mongoose.Schema.Types.ObjectId, ref: 'Post' },
   firstName: String,
@@ -417,6 +430,8 @@ const commentSchema = new mongoose.Schema({
 
 const Comment = mongoose.model('Comment', commentSchema);
 
+
+//Comments
 server.post('/comment/:id', ensureToken, async (req, res) => {
   try {
     jwt.verify(req.token, 'votre-secret-jwt', async (err, decoded) => {
@@ -460,6 +475,8 @@ server.post('/comment/:id', ensureToken, async (req, res) => {
   }
 });
 
+
+//Listen server
 server.listen(PORT, function() {
     console.log(`working on http://localhost:${PORT}`)
 });

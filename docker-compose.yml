@@ -1,0 +1,19 @@
+version: "3.8"
+
+services:
+  back:
+    build: .
+    command: node .
+    environment:
+      MONGO_URL: ${MONGO_URL}
+      JWT_KEY: ${JWT_KEY}
+    ports:
+      - "8080:8080"
+
+  front:
+    image: izimio/kdb-ui:taker-academy-ui-1.0.0
+    restart: always
+    ports:
+      - 3000:3000
+    depends_on:
+      - back
