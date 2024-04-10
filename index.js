@@ -17,10 +17,7 @@ server.use((req, res, next) => {
     next();
 });
 
-mongoose.connect(MONGO_URL, {
-  useNewUrlParser: true,
-  useUnifiedTopology: true
-});
+mongoose.connect(MONGO_URL);
 
 const db = mongoose.connection;
 db.on('error', console.error.bind(console, 'Erreur de connexion à MongoDB :'));
